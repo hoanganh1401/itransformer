@@ -28,7 +28,7 @@ warnings.filterwarnings('ignore')
 AIR_QUALITY_FEATURE_COLS = [
     'pm25', 'pm10', 'no2', 'o3', 'so2', 'co',
     'aod', 'dust', 'uv_index', 'co2',
-    'aqi', 'aqi_pm25', 'aqi_pm10', 'aqi_no2', 'aqi_o3', 'aqi_so2', 'aqi_co'
+    'aqi'
 ]
 
 
