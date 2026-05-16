@@ -31,3 +31,71 @@ mse:0.9255132675170898, mae:0.7251824736595154
 air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl96_dm512_nh8_el3_dl1_df512_fc1_ebtimeF_dtTrue_Exp_0  
 mse:0.5658156275749207, mae:0.5507886409759521
 
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl96_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mse:0.6127969622612, mae:0.5846493244171143
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl96_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.584649, mse:0.612797, rmse:0.782813, mape:2.732797, mspe:530.499146, r2:-0.312756
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl48_ll48_pl24_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.342107, mse:0.266396, rmse:0.516136, mape:1.747648, mspe:291.035706, r2:0.410951
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl48_ll24_pl24_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.370265, mse:0.299733, rmse:0.547479, mape:1.757310, mspe:271.470612, r2:0.337236
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl24_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.362957, mse:0.279706, rmse:0.528872, mape:1.682953, mspe:257.534393, r2:0.381520
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl24_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.369411, mse:0.290303, rmse:0.538798, mape:1.658186, mspe:255.929245, r2:0.358087
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl128_ll48_pl24_dm512_nh8_el3_dl1_df512_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.409393, mse:0.351890, rmse:0.593203, mape:1.791355, mspe:281.042053, r2:0.221908
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl128_ll48_pl24_dm512_nh8_el3_dl1_df512_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.412746, mse:0.341410, rmse:0.584303, mape:1.804269, mspe:259.839600, r2:0.245082
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl128_ll48_pl24_dm512_nh8_el3_dl1_df512_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.409393, mse:0.351890, rmse:0.593203, mape:1.791355, mspe:281.042053, r2:0.221908
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl512_ll48_pl24_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.435036, mse:0.344464, rmse:0.586911, mape:2.101962, mspe:338.047852, r2:0.238328
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl24_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.376365, mse:0.299916, rmse:0.547646, mape:1.740409, mspe:277.413666, r2:0.336832
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl24_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.366748, mse:0.283166, rmse:0.532134, mape:1.703136, mspe:244.039810, r2:0.373868
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl1_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.095634, mse:0.020549, rmse:0.143348, mape:0.664447, mspe:54.266960, r2:0.954402
+
+
+air_quality_AQI_iTransformer_air_quality_ftS_sl96_ll48_pl1_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.221872, mse:0.105613, rmse:0.324981, mape:1.067724, mspe:104.642761, r2:0.765641
+
+
+air_quality_AQI_iTransformer_air_quality_ftMS_sl96_ll48_pl1_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.092071, mse:0.017566, rmse:0.132539, mape:0.508885, mspe:29.713076, r2:0.961019
+
+
+air_quality_AQI_iTransformer_air_quality_ftMS_sl96_ll48_pl1_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.130914, mse:0.040973, rmse:0.202418, mape:0.779558, mspe:8.430464, r2:0.961759
+
+
+air_quality_AQI_iTransformer_air_quality_ftMS_sl96_ll48_pl12_dm128_nh8_el3_dl1_df128_fc1_ebtimeF_dtTrue_Exp_0  
+mae:0.287594, mse:0.167113, rmse:0.408795, mape:2.010903, mspe:67.030823, r2:0.844827
+
+
