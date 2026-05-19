@@ -9,6 +9,7 @@ import os
 import time
 import warnings
 import numpy as np
+import pandas as pd
 
 warnings.filterwarnings('ignore')
 
@@ -244,10 +245,13 @@ class Exp_Long_Term_Forecast(Exp_Basic):
                     input = batch_x.detach().cpu().numpy()
                     if test_data.scale and self.args.inverse:
                         shape = input.shape
-                        input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
+                        if hasattr(test_data, 'inverse_transform_x'):
+                            input = test_data.inverse_transform_x(input.squeeze(0)).reshape(shape)
+                        else:
+                            input = test_data.inverse_transform(input.squeeze(0)).reshape(shape)
                     gt = np.concatenate((input[0, :, -1], true[0, :, -1]), axis=0)
-                    pd = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
-                    visual(gt, pd, os.path.join(folder_path, str(i) + '.pdf'))
+                    pred_curve = np.concatenate((input[0, :, -1], pred[0, :, -1]), axis=0)
+                    visual(gt, pred_curve, os.path.join(folder_path, str(i) + '.pdf'))
 
         preds = np.array(preds)
         trues = np.array(trues)
@@ -267,6 +271,88 @@ class Exp_Long_Term_Forecast(Exp_Basic):
             'mae:{:.6f}, mse:{:.6f}, rmse:{:.6f}, mape:{:.6f}, mspe:{:.6f}, r2:{:.6f}'
             .format(mae, mse, rmse, mape, mspe, r2)
         )
+
+        target_names = getattr(test_data, 'target_names', None)
+        if not target_names or len(target_names) != preds.shape[-1]:
+            target_names = [f'target_{i}' for i in range(preds.shape[-1])]
+
+        forecast_rows = []
+        last_pred = preds[-1]
+        last_true = trues[-1]
+        for step in range(self.args.pred_len):
+            row = {'step': step + 1}
+            for target_idx, target_name in enumerate(target_names):
+                row[f'pred_{target_name}'] = float(last_pred[step, target_idx])
+                row[f'true_{target_name}'] = float(last_true[step, target_idx])
+            forecast_rows.append(row)
+
+        forecast_df = pd.DataFrame(forecast_rows)
+        forecast_path = os.path.join(folder_path, 'multi_step_forecast.csv')
+        forecast_df.to_csv(forecast_path, index=False)
+
+        print('\nMulti-step Forecasting')
+        if not self.args.inverse:
+            print('(values are scaled; add --inverse to print original units)')
+        print(forecast_df.to_string(index=False))
+        print(f'Saved forecast table to: {forecast_path}')
+
+        if hasattr(test_data, 'get_future_forecast_sample'):
+            (
+                future_x,
+                future_label_y,
+                future_x_mark,
+                future_y_mark,
+                future_dates,
+            ) = test_data.get_future_forecast_sample()
+
+            future_x = torch.tensor(future_x).float().unsqueeze(0).to(self.device)
+            future_label_y = torch.tensor(future_label_y).float().unsqueeze(0).to(self.device)
+            future_x_mark = torch.tensor(future_x_mark).float().unsqueeze(0).to(self.device)
+            future_y_mark = torch.tensor(future_y_mark).float().unsqueeze(0).to(self.device)
+
+            future_dec_inp = torch.zeros(
+                (1, self.args.pred_len, future_label_y.shape[-1]),
+                dtype=future_label_y.dtype,
+                device=self.device,
+            )
+            future_dec_inp = torch.cat([future_label_y, future_dec_inp], dim=1)
+
+            self.model.eval()
+            with torch.no_grad():
+                future_outputs = self.model(
+                    future_x,
+                    future_x_mark,
+                    future_dec_inp,
+                    future_y_mark,
+                )
+
+            f_dim = -1 if self.args.features == 'MS' else 0
+            future_outputs = future_outputs[:, -self.args.pred_len:, f_dim:]
+            future_preds = future_outputs.detach().cpu().numpy()
+            if test_data.scale and self.args.inverse:
+                shape = future_preds.shape
+                future_preds = test_data.inverse_transform(future_preds.squeeze(0)).reshape(shape)
+            future_preds = future_preds[0]
+
+            future_rows = []
+            for step, forecast_date in enumerate(future_dates):
+                row = {
+                    'step': step + 1,
+                    'forecast_time': forecast_date,
+                }
+                for target_idx, target_name in enumerate(target_names):
+                    row[f'forecast_{target_name}'] = float(future_preds[step, target_idx])
+                future_rows.append(row)
+
+            future_df = pd.DataFrame(future_rows)
+            future_path = os.path.join(folder_path, 'future_forecast.csv')
+            future_df.to_csv(future_path, index=False)
+
+            print('\nFuture Forecast After Last Test Timestamp')
+            if not self.args.inverse:
+                print('(values are scaled; add --inverse to print original units)')
+            print(future_df.to_string(index=False))
+            print(f'Saved future forecast table to: {future_path}')
 
         f = open("result_long_term_forecast.txt", 'a')
 

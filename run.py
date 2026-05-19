@@ -10,13 +10,13 @@ if __name__ == '__main__':
     torch.manual_seed(fix_seed)
     np.random.seed(fix_seed)
 
-    parser = argparse.ArgumentParser(description='iTransformer - Air Quality Forecasting')
+    parser = argparse.ArgumentParser(description='Transformer - Air Quality Forecasting')
 
     # basic config
     parser.add_argument('--is_training', type=int, required=True, default=1, help='1=train, 0=test only')
     parser.add_argument('--model_id', type=str, required=True, default='air_quality', help='model id')
-    parser.add_argument('--model', type=str, default='iTransformer',
-                        help='model name (only iTransformer is supported)')
+    parser.add_argument('--model', type=str, default='Transformer', choices=['Transformer'],
+                        help='model name (only Transformer is supported)')
 
     # data loader
     parser.add_argument('--data', type=str, default='air_quality', help='dataset type (air_quality)')
@@ -24,7 +24,7 @@ if __name__ == '__main__':
                         help='root path of the data file')
     parser.add_argument('--data_path', type=str, default='air_quality.csv', help='data csv file')
     parser.add_argument('--features', type=str, default='M',
-                        help='M: multivariate→multivariate, S: univariate, MS: multivariate→univariate')
+                        help='M: multivariate->multivariate, S: univariate, MS: multivariate->univariate')
     parser.add_argument('--target', type=str, default='aqi',
                         help='target feature for S or MS task (e.g. aqi, pm25, co2)')
     parser.add_argument('--freq', type=str, default='h',
@@ -38,12 +38,11 @@ if __name__ == '__main__':
     parser.add_argument('--pred_len', type=int, default=96, help='prediction length')
 
     # model define
-    parser.add_argument('--enc_in', type=int, default=391,
-                        help='encoder input size (n_locations × n_features). '
-                             'For air_quality: 23 locations × 17 features = 391. '
-                             'Use 23 for features=S (one feature per location).')
-    parser.add_argument('--dec_in', type=int, default=391, help='decoder input size')
-    parser.add_argument('--c_out', type=int, default=391, help='output size')
+    parser.add_argument('--enc_in', type=int, default=11,
+                        help='encoder input size. For one-location air_quality: '
+                             'use 11 for features=M/MS, or 1 for features=S.')
+    parser.add_argument('--dec_in', type=int, default=11, help='decoder input size')
+    parser.add_argument('--c_out', type=int, default=11, help='output size')
     parser.add_argument('--d_model', type=int, default=512, help='dimension of model')
     parser.add_argument('--n_heads', type=int, default=8, help='num of heads')
     parser.add_argument('--e_layers', type=int, default=3, help='num of encoder layers')
@@ -82,7 +81,7 @@ if __name__ == '__main__':
                         help='use multiple GPUs')
     parser.add_argument('--devices', type=str, default='0,1,2,3', help='GPU device ids')
 
-    # iTransformer specific
+    # Transformer compatibility args
     parser.add_argument('--exp_name', type=str, default='MTSF',
                         help='experiment name: MTSF (multivariate time series forecasting)')
     parser.add_argument('--channel_independence', type=bool, default=False,
@@ -100,6 +99,21 @@ if __name__ == '__main__':
     parser.add_argument('--partial_start_index', type=int, default=0)
 
     args = parser.parse_args()
+    if args.data == 'air_quality':
+        air_quality_dim = 11
+        if args.features == 'S':
+            args.enc_in = 1
+            args.dec_in = 1
+            args.c_out = 1
+        elif args.features == 'MS':
+            args.enc_in = air_quality_dim
+            args.dec_in = 1
+            args.c_out = 1
+        elif args.features == 'M':
+            args.enc_in = air_quality_dim
+            args.dec_in = air_quality_dim
+            args.c_out = air_quality_dim
+
     args.use_gpu = True if torch.cuda.is_available() and args.use_gpu else False
 
     if args.use_gpu and args.use_multi_gpu:

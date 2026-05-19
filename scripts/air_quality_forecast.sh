@@ -1,16 +1,16 @@
 #!/bin/bash
-# Script chạy iTransformer trên tập dữ liệu air_quality.csv
+# Script chạy Transformer trên tập dữ liệu air_quality.csv
 # 
 # Cấu hình mặc định:
-#   - features=M : dự báo multivariate (tất cả feature × location)
-#   - enc_in=391  : 23 location × 17 features
+#   - features=M : dự báo multivariate cho 1 location
+#   - enc_in=11  : 11 air-quality features
 #   - seq_len=96  : nhìn lại 96 time steps
 #   - pred_len=96 : dự báo 96 time steps tiếp theo
 #
 # Chạy:
 #   bash ./scripts/air_quality_forecast.sh
 
-model_name=iTransformer
+model_name=Transformer
 
 # --- Multivariate forecasting (M): dự báo tất cả features ---
 python -u run.py \
@@ -25,9 +25,9 @@ python -u run.py \
   --label_len 48 \
   --pred_len 96 \
   --e_layers 3 \
-  --enc_in 391 \
-  --dec_in 391 \
-  --c_out 391 \
+  --enc_in 11 \
+  --dec_in 11 \
+  --c_out 11 \
   --des 'Exp' \
   --d_model 512 \
   --d_ff 512 \
@@ -52,9 +52,9 @@ python -u run.py \
   --label_len 48 \
   --pred_len 96 \
   --e_layers 3 \
-  --enc_in 23 \
-  --dec_in 23 \
-  --c_out 23 \
+  --enc_in 1 \
+  --dec_in 1 \
+  --c_out 1 \
   --des 'Exp' \
   --d_model 512 \
   --d_ff 512 \

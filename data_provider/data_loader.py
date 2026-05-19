@@ -1,26 +1,21 @@
 """
 Dataset_AirQuality
 ------------------
-Đọc file air_quality.csv (tab-separated) có cấu trúc:
-    ts_utc | pm25 | pm10 | ... | aqi_co | location_key
+Reads one-location air quality CSV files as a regular multivariate time series:
+  - index = timestamp (ts_utc)
+  - columns = sensor/AQI features
 
-Mỗi dòng là một quan sát tại một trạm (location_key) tại một thời điểm.
-Dataset pivot theo location_key để tạo ma trận multivariate time series:
-  - index  = timestamp (ts_utc)
-  - columns= (feature, location) hoặc chỉ (target, location) tùy chế độ
-
-Ghi chú về kích thước dữ liệu:
-  Nếu dữ liệu thực tế của bạn có nhiều timestamp (ví dụ dữ liệu hourly nhiều tháng),
-  dataset sẽ tự động dùng toàn bộ. Script chạy mặc định dùng seq_len=96, pred_len=96
-  → cần ít nhất ~200 time steps để train/val/test có ý nghĩa.
+location_key is treated as metadata. It is not pivoted into model channels.
 """
 import os
 import warnings
+
 import numpy as np
 import pandas as pd
-import torch
-from torch.utils.data import Dataset, DataLoader
+from pandas.tseries.frequencies import to_offset
 from sklearn.preprocessing import StandardScaler
+from torch.utils.data import Dataset, DataLoader
+
 from utils.timefeatures import time_features
 
 warnings.filterwarnings('ignore')
@@ -34,13 +29,13 @@ AIR_QUALITY_FEATURE_COLS = [
 
 class Dataset_AirQuality(Dataset):
     """
-    Dataset cho air_quality.csv.
+    Dataset for one-location air_quality.csv files.
 
-    features='M'  → input và output là tất cả (feature × location)
-    features='S'  → input và output chỉ là `target` × location
-    features='MS' → input là tất cả features, output chỉ là `target`
+    features='M'  -> input and output are all numeric air-quality features
+    features='S'  -> input and output are only the target column
+    features='MS' -> input is all features, output is only the target column
 
-    Split: 70% train / 10% val / 20% test (theo thứ tự thời gian)
+    Split: 70% train / 10% val / 20% test in chronological order.
     """
 
     def __init__(self, root_path, flag='train', size=None,
@@ -64,76 +59,102 @@ class Dataset_AirQuality(Dataset):
         self.data_path = data_path
         self.__read_data__()
 
-    # ------------------------------------------------------------------
     def __read_data__(self):
         self.scaler = StandardScaler()
+        self.scaler_x = StandardScaler()
+        self.scaler_y = StandardScaler()
 
-        df_raw = pd.read_csv(
-            os.path.join(self.root_path, self.data_path),
-            sep=','
-        )
+        df_raw = pd.read_csv(os.path.join(self.root_path, self.data_path), sep=',')
         df_raw = df_raw.rename(columns={'ts_utc': 'date'})
         df_raw['date'] = pd.to_datetime(df_raw['date'], utc=True).dt.tz_localize(None)
 
         feature_cols = [c for c in AIR_QUALITY_FEATURE_COLS if c in df_raw.columns]
-        locations = sorted(df_raw['location_key'].dropna().unique())
+        if not feature_cols:
+            raise ValueError(f"No supported feature columns found in {self.data_path}.")
+        if self.target not in df_raw.columns:
+            raise ValueError(f"Target column '{self.target}' not found in {self.data_path}.")
 
-        # --- Pivot ---
-        if self.features == 'S':
-            pivot = df_raw.pivot_table(
-                index='date', columns='location_key',
-                values=self.target, aggfunc='mean'
-            )
-            pivot.columns = [f"{self.target}__{loc}" for loc in pivot.columns]
+        if 'location_key' in df_raw.columns:
+            locations = sorted(df_raw['location_key'].dropna().unique())
+            if len(locations) > 1:
+                raise ValueError(
+                    f"{self.data_path} contains multiple locations: {locations}. "
+                    "Use one location per file, or split/filter the file before training."
+                )
+            self.location_key = locations[0] if locations else None
         else:
-            frames = []
-            for loc in locations:
-                sub = (df_raw[df_raw['location_key'] == loc][['date'] + feature_cols]
-                       .copy().set_index('date'))
-                sub.columns = [f"{col}__{loc}" for col in sub.columns]
-                frames.append(sub)
-            pivot = pd.concat(frames, axis=1)
+            self.location_key = None
 
-        pivot = pivot.sort_index().ffill().bfill()
-        self.variate_names = list(pivot.columns)
+        ts_data = (
+            df_raw[['date'] + feature_cols]
+            .sort_values('date')
+            .groupby('date', as_index=True)
+            .mean(numeric_only=True)
+            .sort_index()
+            .ffill()
+            .bfill()
+        )
+
+        if self.features == 'S':
+            df_data = ts_data[[self.target]]
+            df_target = ts_data[[self.target]]
+        elif self.features == 'MS':
+            df_data = ts_data[feature_cols]
+            df_target = ts_data[[self.target]]
+        else:
+            df_data = ts_data[feature_cols]
+            df_target = ts_data[feature_cols]
+
+        self.variate_names = list(df_data.columns)
+        self.target_names = list(df_target.columns)
         self.n_variates = len(self.variate_names)
+        self.n_targets = len(self.target_names)
 
-        n = len(pivot)
+        n = len(ts_data)
         if n < self.seq_len + self.pred_len:
             raise ValueError(
-                f"Dữ liệu chỉ có {n} time step sau khi pivot, "
-                f"nhưng cần ít nhất {self.seq_len + self.pred_len} "
+                f"Data has only {n} time steps, "
+                f"but at least {self.seq_len + self.pred_len} are required "
                 f"(seq_len={self.seq_len} + pred_len={self.pred_len}). "
-                "Hãy cung cấp thêm dữ liệu hoặc giảm seq_len/pred_len."
+                "Add more rows or reduce seq_len/pred_len."
             )
 
         num_train = int(n * 0.7)
         num_val = int(n * 0.1)
 
-        border1s = [0,
-                    max(0, num_train - self.seq_len),
-                    max(0, num_train + num_val - self.seq_len)]
+        border1s = [
+            0,
+            max(0, num_train - self.seq_len),
+            max(0, num_train + num_val - self.seq_len),
+        ]
         border2s = [num_train, num_train + num_val, n]
 
         b1 = border1s[self.set_type]
         b2 = border2s[self.set_type]
 
-        df_values = pivot.values.astype(np.float32)
+        x_values = df_data.values.astype(np.float32)
+        y_values = df_target.values.astype(np.float32)
 
-        train_data = df_values[border1s[0]:border2s[0]]
-        if len(train_data) == 0:
+        train_x = x_values[border1s[0]:border2s[0]]
+        train_y = y_values[border1s[0]:border2s[0]]
+        if len(train_x) == 0:
             raise ValueError(
-                f"Không có dữ liệu train (dữ liệu chỉ có {n} time steps). "
-                "Hãy thêm nhiều timestamp hơn vào air_quality.csv."
+                f"No train data available because the file has only {n} time steps. "
+                "Add more timestamps to air_quality.csv."
             )
-        if self.scale:
-            self.scaler.fit(train_data)
-            data = self.scaler.transform(df_values)
-        else:
-            data = df_values
 
-        # --- Time stamp ---
-        ts_slice = pivot.index[b1:b2]
+        if self.scale:
+            self.scaler_x.fit(train_x)
+            self.scaler_y.fit(train_y)
+            data_x = self.scaler_x.transform(x_values)
+            data_y = self.scaler_y.transform(y_values)
+            self.scaler = self.scaler_y
+        else:
+            data_x = x_values
+            data_y = y_values
+
+        ts_slice = ts_data.index[b1:b2]
+        self.date_index = ts_slice
         df_stamp = pd.DataFrame({'date': ts_slice})
         if self.timeenc == 0:
             df_stamp['month'] = df_stamp.date.dt.month
@@ -148,11 +169,46 @@ class Dataset_AirQuality(Dataset):
         else:
             data_stamp = np.zeros((b2 - b1, 1))
 
-        self.data_x = data[b1:b2]
-        self.data_y = data[b1:b2]
+        self.data_x = data_x[b1:b2]
+        self.data_y = data_y[b1:b2]
         self.data_stamp = data_stamp
 
-    # ------------------------------------------------------------------
+    def make_time_features(self, dates):
+        df_stamp = pd.DataFrame({'date': pd.to_datetime(dates)})
+        if self.timeenc == 0:
+            df_stamp['month'] = df_stamp.date.dt.month
+            df_stamp['day'] = df_stamp.date.dt.day
+            df_stamp['weekday'] = df_stamp.date.dt.weekday
+            df_stamp['hour'] = df_stamp.date.dt.hour
+            return df_stamp.drop('date', axis=1).values
+        if self.timeenc == 1:
+            return time_features(
+                pd.to_datetime(df_stamp['date'].values), freq=self.freq
+            ).transpose(1, 0)
+        return np.zeros((len(df_stamp), 1))
+
+    def get_future_forecast_sample(self):
+        if len(self.data_x) < self.seq_len or len(self.data_y) < self.label_len:
+            raise ValueError("Not enough data to build the final future forecast sample.")
+
+        offset = to_offset(self.freq)
+        last_date = self.date_index[-1]
+        future_dates = pd.date_range(
+            start=last_date + offset,
+            periods=self.pred_len,
+            freq=offset,
+        )
+        label_dates = self.date_index[-self.label_len:]
+        decoder_dates = label_dates.append(future_dates)
+
+        return (
+            self.data_x[-self.seq_len:],
+            self.data_y[-self.label_len:],
+            self.data_stamp[-self.seq_len:],
+            self.make_time_features(decoder_dates),
+            future_dates,
+        )
+
     def __getitem__(self, index):
         s_begin = index
         s_end = s_begin + self.seq_len
@@ -171,3 +227,6 @@ class Dataset_AirQuality(Dataset):
 
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
+
+    def inverse_transform_x(self, data):
+        return self.scaler_x.inverse_transform(data)
